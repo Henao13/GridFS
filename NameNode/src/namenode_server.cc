@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 using grpc::ServerContext;
 using grpc::Status;
@@ -237,7 +238,7 @@ Status NameNodeServiceImpl::LoginUser(ServerContext* /*ctx*/,
 // CreateFile: el cliente solicita crear (planificar) un archivo -> devolvemos bloques asignados.
 Status NameNodeServiceImpl::CreateFile(ServerContext* /*ctx*/,
                                        const griddfs::CreateFileRequest* request,
-                                       const griddfs::CreateFileResponse* response) {
+                                       griddfs::CreateFileResponse* response) {
     std::lock_guard<std::mutex> lock(mu_);
     
     const std::string& filename = request->filename();
@@ -727,9 +728,10 @@ bool NameNodeServiceImpl::SaveSnapshotUnlocked() {
         out << "FILE\t" << file_key << "\t" << fm.owner_id << "\t"
             << fm.size << "\t" << ms << "\t" << fm.filename << "\n";
 
-        for (const auto& b : fm.blocks) {
+        for (size_t idx = 0; idx < fm.blocks.size(); ++idx) {
+            const auto& b = fm.blocks[idx];
             out << "BLK\t" << file_key << "\t" << b.block_id() << "\t"
-                << b.index() << "\t" << b.size() << "\n";
+                << idx << "\t" << b.size() << "\n";
             for (const auto& dn : b.datanodes()) {
                 out << "LOC\t" << b.block_id() << "\t" << dn.id()
                     << "\t" << dn.address() << "\n";
@@ -810,7 +812,6 @@ bool NameNodeServiceImpl::LoadSnapshotUnlocked() {
             if (it != file_index.end()) {
                 griddfs::BlockInfo bi;
                 bi.set_block_id(blk_id);
-                bi.set_index(idx);
                 bi.set_size(sz);
                 it->second->blocks.push_back(bi);
                 blk_index[blk_id] = &it->second->blocks.back();
