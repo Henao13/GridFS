@@ -12,7 +12,7 @@ find_package(gRPC REQUIRED)
 set(PROTO_GEN_DIR ${CMAKE_SOURCE_DIR})
 
 # Includes
-include_directories(${Protobuf_INCLUDE_DIRS} ${PROTO_GEN_DIR})
+include_directories(${Protobuf_INCLUDE_DIRS} ${PROTO_GEN_DIR} ${CMAKE_SOURCE_DIR}/third_party)
 
 # Fuentes
 set(SRC_MAIN

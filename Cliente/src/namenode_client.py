@@ -1,13 +1,30 @@
+# Cliente/src/namenode_client.py
+import os
 import grpc
 from .griddfs import griddfs_pb2 as pb2
 from .griddfs import griddfs_pb2_grpc as pb2_grpc
 
-
 class NameNodeClient:
-    def __init__(self, host="localhost", port=50050):
-        channel = grpc.insecure_channel(f"{host}:{port}")
-        self.stub = pb2_grpc.NameNodeServiceStub(channel)
-        self.user_id = None  # Se establece después del login
+    def __init__(self, host: str = None, port: int = None, **kwargs):
+        # Defaults desde env o localhost:50050
+        env = os.environ.get("GRIDDFS_NAMENODE", "localhost:50050")
+        if host is None or port is None:
+            if ":" in env:
+                eh, ep = env.split(":", 1)
+                host = host or eh
+                port = port or int(ep)
+            else:
+                host = host or "localhost"
+                port = port or 50050
+
+        target = f"{host}:{port}"
+        self.channel = grpc.insecure_channel(target)                # ← crea el canal
+        self.stub = pb2_grpc.NameNodeServiceStub(self.channel)      # ← úsalo aquí
+
+        # opcional: persistir user_id/token si los usas
+        self.user_id = kwargs.get("user_id")
+
+
 
     def login(self, username, password):
         """Autentica al usuario y establece user_id"""

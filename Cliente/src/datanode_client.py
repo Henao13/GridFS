@@ -4,9 +4,11 @@ from .griddfs import griddfs_pb2_grpc as pb2_grpc
 
 
 class DataNodeClient:
-    def __init__(self, host="localhost", port=50051):
-        channel = grpc.insecure_channel(f"{host}:{port}")
-        self.stub = pb2_grpc.DataNodeServiceStub(channel)
+    def __init__(self, host: str, port: int, **kwargs):
+        target = f"{host}:{port}"
+        self._channel = grpc.insecure_channel(target)
+        self._stub = pb2_grpc.DataNodeStub(self._channel)
+        self._token = kwargs.get("token")
 
     def write_block(self, block_id, data, chunk_size=64*1024):
         def request_generator():

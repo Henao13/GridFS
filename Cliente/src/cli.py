@@ -1,4 +1,5 @@
 import argparse
+from email import parser
 import getpass
 import os
 import json
@@ -16,6 +17,15 @@ import json
 terminal_id = os.environ.get('GRIDDFS_TERMINAL', str(os.getppid()))
 SESSION_FILE = os.path.expanduser(f"~/.griddfs_session_{terminal_id}")
 WORKDIR_FILE = os.path.expanduser(f"~/.griddfs_workdir_{terminal_id}")
+
+NN_HOST = "localhost"
+NN_PORT = 50050
+
+def _parse_host_port(s: str):
+    if ":" in s:
+        h, p = s.split(":", 1)
+        return h, int(p)
+    return s, 50050
 
 def save_session(user_id, username):
     """Guarda la sesión del usuario"""
@@ -80,9 +90,8 @@ def resolve_path(path, current_dir="/"):
             return current_dir.rstrip("/") + "/" + path
 
 def get_authenticated_client():
-    """Obtiene un cliente autenticado"""
     session = load_session()
-    namenode = NameNodeClient()
+    namenode = NameNodeClient(NN_HOST, NN_PORT)
     
     if session:
         namenode.user_id = session["user_id"]
@@ -96,6 +105,12 @@ def get_authenticated_client():
 
 def main():
     parser = argparse.ArgumentParser(description="GridDFS CLI")
+    parser = argparse.ArgumentParser(description="GridDFS CLI")
+    parser.add_argument(
+        "--namenode",
+        default=os.environ.get("GRIDDFS_NAMENODE", "localhost:50050"),
+        help="host:port del NameNode (ej: 18.208.28.6:50050)"
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     # login
@@ -144,10 +159,14 @@ def main():
     pwd_parser = subparsers.add_parser("pwd", help="Mostrar directorio actual")
 
     args = parser.parse_args()
+    global NN_HOST, NN_PORT
+    NN_HOST, NN_PORT = _parse_host_port(args.namenode)
+
 
     if args.command == "login":
         password = getpass.getpass("Contraseña: ")
-        namenode = NameNodeClient()
+        namenode = NameNodeClient(NN_HOST, NN_PORT)
+
         resp = namenode.login(args.username, password)
         if resp.success:
             save_session(resp.user_id, args.username)
@@ -158,7 +177,7 @@ def main():
 
     elif args.command == "register":
         password = getpass.getpass("Contraseña: ")
-        namenode = NameNodeClient()
+        namenode = NameNodeClient(NN_HOST, NN_PORT)
         resp = namenode.register_user(args.username, password)
         if resp.success:
             print(f"✓ Usuario {args.username} registrado exitosamente")

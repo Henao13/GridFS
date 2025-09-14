@@ -7,6 +7,9 @@
 #include <iomanip>
 #include <functional>
 #include <set>
+#include <fstream>
+#include <sys/stat.h>
+#include <unistd.h>
 
 using grpc::ServerContext;
 using grpc::Status;
@@ -60,6 +63,7 @@ std::vector<griddfs::DataNodeInfo> selectDataNodesForReplication(
     
     // Crear vector de pares (peso, índice) para ordenar
     std::vector<std::pair<uint64_t, size_t>> weights;
+    weights.reserve(datanodes.size());
     for (size_t i = 0; i < datanodes.size(); ++i) {
         uint64_t weight = calculateHRW(block_id, datanodes[i].id());
         weights.push_back({weight, i});
@@ -72,7 +76,7 @@ std::vector<griddfs::DataNodeInfo> selectDataNodesForReplication(
     // Seleccionar los primeros 'count' DataNodes
     std::vector<griddfs::DataNodeInfo> selected;
     int selected_count = std::min(count, static_cast<int>(datanodes.size()));
-    
+    selected.reserve(selected_count);
     for (int i = 0; i < selected_count; ++i) {
         selected.push_back(datanodes[weights[i].second]);
     }
@@ -84,6 +88,18 @@ std::vector<griddfs::DataNodeInfo> selectDataNodesForReplication(
 NameNodeServiceImpl::NameNodeServiceImpl() {
     // registrar directorio raíz por defecto (opcional)
     directories_.insert("/");
+
+    // inicializa meta_dir_ desde env (persistencia)
+    if (const char* d = std::getenv("GRIDDFS_META_DIR")) {
+        meta_dir_ = d;
+    } else {
+        meta_dir_ = "/var/lib/griddfs/meta";
+    }
+    ::mkdir(meta_dir_.c_str(), 0755);
+
+    // Carga snapshot si existe
+    std::lock_guard<std::mutex> lock(mu_);
+    (void)LoadSnapshotUnlocked();
 }
 
 // =============================================
@@ -103,10 +119,9 @@ std::string NameNodeServiceImpl::generateUserId() {
 }
 
 std::string NameNodeServiceImpl::hashPassword(const std::string& password) {
-    // Hash simple por ahora (en producción usar bcrypt)
+    // Hash simple por ahora (en producción usar bcrypt/argon2)
     std::hash<std::string> hasher;
     size_t hash_value = hasher(password + "salt_griddfs");
-    
     std::stringstream ss;
     ss << std::hex << hash_value;
     return ss.str();
@@ -174,6 +189,9 @@ Status NameNodeServiceImpl::RegisterUser(ServerContext* /*ctx*/,
     response->set_message("Usuario registrado exitosamente");
     
     std::cout << "[RegisterUser] " << username << " -> " << user.user_id << std::endl;
+
+    // >>> Persistencia
+    (void)SaveSnapshotUnlocked();
     
     return Status::OK;
 }
@@ -219,7 +237,7 @@ Status NameNodeServiceImpl::LoginUser(ServerContext* /*ctx*/,
 // CreateFile: el cliente solicita crear (planificar) un archivo -> devolvemos bloques asignados.
 Status NameNodeServiceImpl::CreateFile(ServerContext* /*ctx*/,
                                        const griddfs::CreateFileRequest* request,
-                                       griddfs::CreateFileResponse* response) {
+                                       const griddfs::CreateFileResponse* response) {
     std::lock_guard<std::mutex> lock(mu_);
     
     const std::string& filename = request->filename();
@@ -281,7 +299,7 @@ Status NameNodeServiceImpl::CreateFile(ServerContext* /*ctx*/,
         file_meta.blocks.push_back(bi);
 
         // Añadir al response
-        griddfs::BlockInfo* out_bi = response->add_blocks();
+        griddfs::BlockInfo* out_bi = const_cast<griddfs::CreateFileResponse*>(response)->add_blocks();
         out_bi->CopyFrom(bi);
 
         std::cout << "[CreateFile] " << filename << " (owner: " << user_id << ") -> block " << bi.block_id()
@@ -295,6 +313,9 @@ Status NameNodeServiceImpl::CreateFile(ServerContext* /*ctx*/,
     
     // Guardar metadata del archivo con clave única
     files_[file_key] = file_meta;
+
+    // >>> Persistencia
+    (void)SaveSnapshotUnlocked();
 
     return Status::OK;
 }
@@ -477,15 +498,16 @@ Status NameNodeServiceImpl::DeleteFile(ServerContext* /*ctx*/,
         return Status::OK;
     }
     
-    // El archivo pertenece automáticamente al usuario ya que usamos la clave única
-    // No necesitamos verificar ownership separadamente
-    
     // Eliminar archivo
     files_.erase(it);
     response->set_success(true);
     response->set_message("Archivo eliminado exitosamente");
     
     std::cout << "[DeleteFile] " << filename << " eliminado por " << user_id << std::endl;
+
+    // >>> Persistencia
+    (void)SaveSnapshotUnlocked();
+
     return Status::OK;
 }
 
@@ -507,6 +529,10 @@ Status NameNodeServiceImpl::CreateDirectory(ServerContext* /*ctx*/,
     directories_.insert(dir);
     response->set_success(true);
     std::cout << "[CreateDirectory] " << dir << " creado por " << user_id << std::endl;
+
+    // >>> Persistencia
+    (void)SaveSnapshotUnlocked();
+
     return Status::OK;
 }
 
@@ -534,24 +560,40 @@ Status NameNodeServiceImpl::RemoveDirectory(ServerContext* /*ctx*/,
     directories_.erase(dir);
     response->set_success(true);
     std::cout << "[RemoveDirectory] " << dir << " eliminado por " << user_id << std::endl;
+
+    // >>> Persistencia
+    (void)SaveSnapshotUnlocked();
+
     return Status::OK;
 }
 
 // =============================================
-// SERVICIOS DE DATANODE (SIN CAMBIOS)
+// SERVICIOS DE DATANODE
 // =============================================
 
-// RegisterDataNode: añade/actualiza DataNode en la tabla
-Status NameNodeServiceImpl::RegisterDataNode(ServerContext* /*ctx*/,
+// RegisterDataNode: añade/actualiza DataNode en la tabla (corrige localhost -> IP real)
+Status NameNodeServiceImpl::RegisterDataNode(ServerContext* ctx,
                                              const griddfs::RegisterDataNodeRequest* request,
                                              griddfs::RegisterDataNodeResponse* response) {
     std::lock_guard<std::mutex> lock(mu_);
-    const griddfs::DataNodeInfo& dn = request->datanode();
-    std::string id = dn.id();
-    datanodes_[id] = dn; // copia el mensaje
+
+    const griddfs::DataNodeInfo& in = request->datanode();
+    std::string id = in.id();
+
+    // IP real del peer que ve el servidor
+    std::string peer_ip   = PeerIpFromContext(ctx);
+    std::string fixed_addr = FixLocalhostAddr(in.address(), peer_ip);
+
+    // Guarda el DN con la dirección corregida (no localhost)
+    griddfs::DataNodeInfo dn = in;
+    dn.set_address(fixed_addr);
+    datanodes_[id] = dn;
+
     response->set_success(true);
-    std::cout << "[RegisterDataNode] id=" << id << " addr=" << dn.address()
-              << " capacity=" << dn.capacity() << " free=" << dn.free_space() << "\n";
+    std::cout << "[RegisterDataNode] id=" << id
+              << " addr=" << dn.address()
+              << " capacity=" << dn.capacity()
+              << " free=" << dn.free_space() << "\n";
     return Status::OK;
 }
 
@@ -591,6 +633,8 @@ Status NameNodeServiceImpl::BlockReport(ServerContext* /*ctx*/,
 
     const griddfs::DataNodeInfo& dn_info = it_dn->second;
 
+    bool changed = false;
+
     // Para cada block_id reportado, intentamos asociar este DataNode al BlockInfo en files_
     for (const std::string& blk_id : request->block_ids()) {
         bool found = false;
@@ -610,6 +654,7 @@ Status NameNodeServiceImpl::BlockReport(ServerContext* /*ctx*/,
                     if (!already) {
                         griddfs::DataNodeInfo* newdn = bi.add_datanodes();
                         newdn->CopyFrom(dn_info);
+                        changed = true;
                         std::cout << "[BlockReport] asociando block " << blk_id << " -> datanode " << id << "\n";
                     }
                 }
@@ -619,6 +664,11 @@ Status NameNodeServiceImpl::BlockReport(ServerContext* /*ctx*/,
         if (!found) {
             std::cout << "[BlockReport] block " << blk_id << " no está en metadatos (ignorado)\n";
         }
+    }
+
+    if (changed) {
+        // >>> Persistencia solo si hubo cambios reales
+        (void)SaveSnapshotUnlocked();
     }
 
     response->set_success(true);
@@ -634,4 +684,175 @@ bool NameNodeServiceImpl::starts_with(const std::string& s, const std::string& p
     if (prefix.empty()) return true;
     if (prefix.size() > s.size()) return false;
     return std::equal(prefix.begin(), prefix.end(), s.begin());
+}
+
+// ================================
+// Persistencia (Snapshot plano)
+// ================================
+std::string NameNodeServiceImpl::MetaPath(const std::string& file) const {
+    return meta_dir_.empty() ? ("/var/lib/griddfs/meta/" + file) : (meta_dir_ + "/" + file);
+}
+
+// Formato de fsimage.txt (líneas con '\t'):
+// SEQ 1
+// USER  <user_id>\t<username>\t<password_hash>\t<created_ms>
+// DIR   <path>
+// FILE  <file_key>\t<owner_id>\t<size>\t<created_ms>\t<filename>
+// BLK   <file_key>\t<block_id>\t<idx>\t<size>
+// LOC   <block_id>\t<datanode_id>\t<address>
+bool NameNodeServiceImpl::SaveSnapshotUnlocked() {
+    std::ostringstream out;
+
+    out << "SEQ\t1\n";
+    // USERS
+    for (const auto& kv : users_) {
+        const auto& u = kv.second;
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      u.created_time.time_since_epoch()).count();
+        out << "USER\t" << u.user_id << "\t" << u.username << "\t"
+            << u.password_hash << "\t" << ms << "\n";
+    }
+
+    // DIRS
+    for (const auto& d : directories_) {
+        out << "DIR\t" << d << "\n";
+    }
+
+    // FILES + BLOCKS + LOCATIONS
+    for (const auto& kv : files_) {
+        const std::string& file_key = kv.first;       // user_id:filename
+        const FileMetadata& fm = kv.second;
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      fm.created_time.time_since_epoch()).count();
+        out << "FILE\t" << file_key << "\t" << fm.owner_id << "\t"
+            << fm.size << "\t" << ms << "\t" << fm.filename << "\n";
+
+        for (const auto& b : fm.blocks) {
+            out << "BLK\t" << file_key << "\t" << b.block_id() << "\t"
+                << b.index() << "\t" << b.size() << "\n";
+            for (const auto& dn : b.datanodes()) {
+                out << "LOC\t" << b.block_id() << "\t" << dn.id()
+                    << "\t" << dn.address() << "\n";
+            }
+        }
+    }
+
+    // Escritura atómica a fsimage.txt
+    const std::string path = MetaPath("fsimage.txt");
+    const std::string tmp  = path + ".tmp";
+    {
+        std::ofstream ofs(tmp, std::ios::binary | std::ios::trunc);
+        if (!ofs) return false;
+        const auto s = out.str();
+        ofs.write(s.data(), s.size());
+        ofs.flush();
+        int fd = ::open(tmp.c_str(), O_RDONLY);
+        if (fd >= 0) { ::fsync(fd); ::close(fd); }
+    }
+    ::rename(tmp.c_str(), path.c_str());
+    return true;
+}
+
+static std::vector<std::string> SplitTabs(const std::string& line) {
+    std::vector<std::string> v;
+    std::string cur;
+    std::istringstream is(line);
+    while (std::getline(is, cur, '\t')) v.push_back(cur);
+    return v;
+}
+
+bool NameNodeServiceImpl::LoadSnapshotUnlocked() {
+    const std::string path = MetaPath("fsimage.txt");
+    std::ifstream ifs(path);
+    if (!ifs) return false; // primera vez
+
+    users_.clear(); users_by_id_.clear();
+    files_.clear(); directories_.clear(); directories_.insert("/");
+
+    // Para mapear block_id -> BlockInfo*
+    std::unordered_map<std::string, griddfs::BlockInfo*> blk_index;
+    // Para asegurar que FILE aparezca antes que BLK del mismo file_key
+    std::unordered_map<std::string, FileMetadata*> file_index;
+
+    std::string line;
+    while (std::getline(ifs, line)) {
+        if (line.empty()) continue;
+        auto t = SplitTabs(line);
+        if (t.empty()) continue;
+
+        if (t[0] == "USER" && t.size() >= 5) {
+            UserInfo u;
+            u.user_id = t[1];
+            u.username = t[2];
+            u.password_hash = t[3];
+            int64_t ms = std::stoll(t[4]);
+            u.created_time = std::chrono::system_clock::time_point(std::chrono::milliseconds(ms));
+            users_[u.username] = u;
+            users_by_id_[u.user_id] = u;
+        } else if (t[0] == "DIR" && t.size() >= 2) {
+            directories_.insert(t[1]);
+        } else if (t[0] == "FILE" && t.size() >= 6) {
+            std::string file_key = t[1];
+            FileMetadata fm;
+            fm.owner_id = t[2];
+            fm.size = static_cast<int64_t>(std::stoll(t[3]));
+            int64_t ms = std::stoll(t[4]);
+            fm.created_time = std::chrono::system_clock::time_point(std::chrono::milliseconds(ms));
+            fm.filename = t[5]; // nombre “visible”
+            files_[file_key] = fm;
+            file_index[file_key] = &files_[file_key];
+        } else if (t[0] == "BLK" && t.size() >= 5) {
+            std::string file_key = t[1];
+            std::string blk_id   = t[2];
+            int idx = std::stoi(t[3]);
+            int64_t sz = std::stoll(t[4]);
+            auto it = file_index.find(file_key);
+            if (it != file_index.end()) {
+                griddfs::BlockInfo bi;
+                bi.set_block_id(blk_id);
+                bi.set_index(idx);
+                bi.set_size(sz);
+                it->second->blocks.push_back(bi);
+                blk_index[blk_id] = &it->second->blocks.back();
+            }
+        } else if (t[0] == "LOC" && t.size() >= 4) {
+            std::string blk_id = t[1];
+            std::string dn_id  = t[2];
+            std::string addr   = t[3];
+            auto it = blk_index.find(blk_id);
+            if (it != blk_index.end()) {
+                auto* dni = it->second->add_datanodes();
+                dni->set_id(dn_id);
+                dni->set_address(addr);
+            }
+        }
+    }
+    return true;
+}
+
+// ================================
+// Utilidades de red (ctx->peer())
+// ================================
+std::string NameNodeServiceImpl::PeerIpFromContext(grpc::ServerContext* ctx) const {
+    // ctx->peer(): "ipv4:18.208.28.6:54321" o "ipv6:[::1]:puerto"
+    std::string peer = ctx->peer();
+    auto a = peer.find(':');              // después de "ipv4" / "ipv6"
+    if (a == std::string::npos) return peer;
+    auto b = peer.find(':', a + 1);       // separa IP y PORT
+    if (b == std::string::npos) return peer;
+    return peer.substr(a + 1, b - (a + 1));  // "18.208.28.6" o "[::1]"
+}
+
+bool NameNodeServiceImpl::IsLocalhost(const std::string& host) {
+    return host == "localhost" || host.rfind("127.", 0) == 0 || host == "::1" || host == "[::1]";
+}
+
+std::string NameNodeServiceImpl::FixLocalhostAddr(const std::string& addr,
+                                                  const std::string& peer_ip) {
+    // addr tiene forma "host:port" (p.ej "localhost:50051")
+    auto c = addr.rfind(':');
+    std::string host = (c == std::string::npos) ? addr : addr.substr(0, c);
+    std::string port = (c == std::string::npos) ? "50051" : addr.substr(c + 1);
+    if (IsLocalhost(host)) return peer_ip + ":" + port;
+    return addr;
 }
