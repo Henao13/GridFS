@@ -1,0 +1,226 @@
+syntax = "proto3";
+
+package griddfs;
+
+option java_package = "griddfs";
+option java_multiple_files = true;
+
+// ==============================
+// Mensajes básicos
+// ==============================
+
+// Información de un DataNode
+message DataNodeInfo {
+  string id = 1;          // Identificador único del DataNode
+  string address = 2;     // Dirección IP:puerto
+  int64 capacity = 3;     // Capacidad total del nodo
+  int64 free_space = 4;   // Espacio libre disponible
+}
+
+// Información de un bloque
+message BlockInfo {
+  string block_id = 1;                   // Identificador único del bloque
+  int64 size = 2;                        // Tamaño en bytes
+  repeated DataNodeInfo datanodes = 3;   // Lista de DataNodes que deben almacenar este bloque
+}
+
+// ==============================
+// Servicios del NameNode
+// ==============================
+service NameNodeService {
+  // Autenticación de usuario
+  rpc LoginUser(LoginRequest) returns (LoginResponse);
+  
+  // Registrar nuevo usuario
+  rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse);
+
+  // Crear un archivo (PUT - fase de planificación)
+  rpc CreateFile(CreateFileRequest) returns (CreateFileResponse);
+
+  // Obtener información de un archivo (GET - ubicaciones de bloques)
+  rpc GetFileInfo(GetFileInfoRequest) returns (GetFileInfoResponse);
+
+  // Listar archivos en un directorio
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+
+  // Eliminar un archivo
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+
+  // Crear un directorio
+  rpc CreateDirectory(CreateDirectoryRequest) returns (CreateDirectoryResponse);
+
+  // Eliminar un directorio
+  rpc RemoveDirectory(RemoveDirectoryRequest) returns (RemoveDirectoryResponse);
+
+  // Registro de DataNode
+  rpc RegisterDataNode(RegisterDataNodeRequest) returns (RegisterDataNodeResponse);
+
+  // Heartbeat de un DataNode
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Reporte de bloques de un DataNode
+  rpc BlockReport(BlockReportRequest) returns (BlockReportResponse);
+}
+
+// ==============================
+// Mensajes para NameNode
+// ==============================
+message CreateFileRequest {
+  string filename = 1;
+  int64 filesize = 2;
+  string user_id = 3;      // ID del usuario que crea el archivo
+}
+
+message CreateFileResponse {
+  repeated BlockInfo blocks = 1; // Lista de bloques y sus DataNodes asignados
+}
+
+message GetFileInfoRequest {
+  string filename = 1;
+  string user_id = 2;      // ID del usuario que solicita el archivo
+}
+
+message GetFileInfoResponse {
+  repeated BlockInfo blocks = 1; // Lista de bloques y sus DataNodes disponibles
+  string owner_id = 2;           // Propietario del archivo
+}
+
+message ListFilesRequest {
+  string directory = 1;
+  string user_id = 2;      // ID del usuario que lista los archivos
+}
+
+message ListFilesResponse {
+  repeated FileMetadata files = 1;
+}
+
+// Metadata de archivo con información de propietario
+message FileMetadata {
+  string filename = 1;
+  string owner_id = 2;     // Propietario del archivo
+  int64 size = 3;          // Tamaño del archivo
+  int64 created_time = 4;  // Timestamp de creación
+}
+
+message DeleteFileRequest {
+  string filename = 1;
+  string user_id = 2;      // ID del usuario que quiere eliminar el archivo
+}
+
+message DeleteFileResponse {
+  bool success = 1;
+  string message = 2;      // Mensaje de error si no se puede eliminar
+}
+
+message CreateDirectoryRequest {
+  string directory = 1;
+  string user_id = 2;      // ID del usuario que crea el directorio
+}
+
+message CreateDirectoryResponse {
+  bool success = 1;
+}
+
+message RemoveDirectoryRequest {
+  string directory = 1;
+  string user_id = 2;      // ID del usuario que elimina el directorio
+}
+
+message RemoveDirectoryResponse {
+  bool success = 1;
+  string message = 2;      // Mensaje de error si no se puede eliminar
+}
+
+message RegisterDataNodeRequest {
+  DataNodeInfo datanode = 1;
+}
+
+message RegisterDataNodeResponse {
+  bool success = 1;
+}
+
+message HeartbeatRequest {
+  string datanode_id = 1;
+  int64 free_space = 2;
+}
+
+message HeartbeatResponse {
+  bool success = 1;
+}
+
+message BlockReportRequest {
+  string datanode_id = 1;
+  repeated string block_ids = 2;
+}
+
+message BlockReportResponse {
+  bool success = 1;
+}
+
+// ==============================
+// Servicios del DataNode
+// ==============================
+service DataNodeService {
+  // Cliente → DataNode: escribir bloque
+  rpc WriteBlock(stream WriteBlockRequest) returns (WriteBlockResponse);
+
+  // Cliente → DataNode: leer bloque
+  rpc ReadBlock(ReadBlockRequest) returns (stream ReadBlockResponse);
+
+  // Cliente/NameNode → DataNode: borrar bloque
+  rpc DeleteBlock(DeleteBlockRequest) returns (DeleteBlockResponse);
+}
+
+// ==============================
+// Mensajes para DataNode
+// ==============================
+message WriteBlockRequest {
+  string block_id = 1;
+  bytes data = 2; // fragmento de datos del bloque (streaming)
+}
+
+message WriteBlockResponse {
+  bool success = 1;
+}
+
+message ReadBlockRequest {
+  string block_id = 1;
+}
+
+message ReadBlockResponse {
+  bytes data = 1; // fragmento de datos del bloque (streaming)
+}
+
+message DeleteBlockRequest {
+  string block_id = 1;
+}
+
+message DeleteBlockResponse {
+  bool success = 1;
+}
+
+// ==============================
+// Mensajes de Autenticación
+// ==============================
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  bool success = 1;
+  string user_id = 2;      // ID único del usuario
+  string message = 3;      // Mensaje de error si falla
+}
+
+message RegisterUserRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message RegisterUserResponse {
+  bool success = 1;
+  string user_id = 2;      // ID único del usuario creado
+  string message = 3;      // Mensaje de error si falla
+}
+

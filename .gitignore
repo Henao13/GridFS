@@ -1,0 +1,84 @@
+# Archivos compilados y binarios
+*.class
+*.jar
+!target/datanode-1.0-SNAPSHOT.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Archivos de build
+target/
+build/
+out/
+bin/
+
+# Archivos de IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+
+# Archivos de sistema
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.tmp
+*.temp
+
+# Archivos de logs
+*.log
+logs/
+
+# Archivos de configuración sensibles
+*.env.local
+*.env.production
+secrets.txt
+
+# Archivos generados por CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Archivos específicos del proyecto
+Cliente/archivo_*.txt
+Cliente/downloaded_*.txt
+Cliente/test*.txt
+Cliente/ejemplo.txt
+
+# Archivos de backup y temporales
+*.bak
+*.backup
+*.orig
+*~
+
+# Directorios de almacenamiento
+**/griddfs-storage/
+**/storage/
+
+# Zone Identifier files (Windows WSL)
+*:Zone.Identifier

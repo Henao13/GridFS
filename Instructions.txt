@@ -1,0 +1,111 @@
+Ejecutar siempre desde la carpeta que se dice, esto jode mucho por rutas
+
+
+
+NAMENODE
+
+Cada que se haga un cambio en los archivos c++ entrar desde la terminal a la carpeta build en NameNode y ejecutar 
+
+cmake ..
+make -j
+
+Esto ya crea el ejecutable y ya solo hay que tirar el comando 
+
+./namenode
+
+Y ya queda corriendo el servidor en el puerto y escuchando peticiones en 
+
+0.0.0.0:50050
+
+
+
+
+DATANODE
+
+Cada que se hagan cambios en el datanode, que solo es necesario modificar el DataNodeServer.java, entonces se para en la carpeta DataNode y ejecuta
+
+mvn clean compile
+mvn clean package
+
+Esto crea la carpeta target y para compilar ejecuta
+
+java -jar target/datanode-1.0-SNAPSHOT.jar 50051 /tmp/datanode datanode1 127.0.0.1 50050
+java -jar target/datanode-1.0-SNAPSHOT.jar 50052 /tmp/datanode datanode2 127.0.0.1 50050
+
+50051: Puerto en el que corre el datanode
+datanode1: Nombre o id del datanode
+127.0.0.1 50050: Dirección donde corre el namenode, esta dejarla así
+
+Ya con esto el datanode queda corriendo en el localhost:50051
+
+
+
+
+
+CLIENTE
+
+Para ejecutar el cliente tiene que ser desde la carpeta Cliente y se ejecuta el comando
+
+python3 -m src.cli ...
+
+COMANDOS DE AUTENTICACIÓN:
+- python3 -m src.cli register <username>                       # Registrar nuevo usuario (pide contraseña)
+- python3 -m src.cli login <username>                          # Iniciar sesión (pide contraseña)
+- python3 -m src.cli logout                                    # Cerrar sesión
+- python3 -m src.cli whoami                                    # Ver usuario actual
+
+COMANDOS DE ARCHIVOS (requieren login):
+- python3 -m src.cli put ejemplo.txt                           # Subir archivo (se asocia al usuario logueado)
+- python3 -m src.cli get ejemplo.txt                           # Descargar archivo
+- python3 -m src.cli ls [directorio]                           # Listar archivos con propietario y tamaño
+- python3 -m src.cli rm ejemplo.txt                            # Eliminar archivo (solo el propietario puede)
+- python3 -m src.cli mkdir nueva_carpeta                       # Crear directorio
+
+EJEMPLO DE USO:
+1. Registrar usuario: python3 -m src.cli register juan
+2. Iniciar sesión: python3 -m src.cli login juan
+3. Subir archivo: python3 -m src.cli put ejemplo.txt
+4. Listar archivos: python3 -m src.cli ls
+   Salida: test.txt (propietario: user_12345, tamaño: 1024 bytes)
+5. Solo juan puede eliminar: python3 -m src.cli rm test.txt
+
+Para modificarlo si no hay problema, es python3
+
+
+
+
+
+PARA EJECUTAR Y PROBAR
+
+Se crea una terminal y se pone a correr el namenode con el ./namenode
+Se crean otras terminales y se ponen a correr datanodes cambiando el puerto y el id
+Se crea otra terminal y se tiran los comandos del cliente
+
+
+
+
+
+FALTA
+
+✅ SISTEMA DE AUTENTICACIÓN COMPLETO IMPLEMENTADO:
+- ✅ Protocolos gRPC actualizados (usuario/contraseña)
+- ✅ NameNode C++ con autenticación completa
+- ✅ Cliente Python con comandos de auth
+- ✅ Sistema de sesiones persistentes
+- ✅ Verificación de propietario en archivos
+- ✅ Algoritmo HRW (Highest Random Weight) para distribución de bloques
+
+PARA COMPILAR Y PROBAR:
+1. Recompilar NameNode: cd NameNode/build && cmake .. && make
+2. Recompilar DataNode: cd DataNode && mvn clean package
+3. Probar sistema completo con múltiples usuarios
+
+source /home/juanpa/venvs/grpc/bin/activate && cd "/home/juanpa/Proyecto 1/Proyecto 1/Cliente" && echo "123456" | python3 -m src.cli register juan
+source /home/juanpa/venvs/grpc/bin/activate && cd "/home/juanpa/Proyecto 1/Proyecto 1/Cliente" && echo "123456" | python3 -m src.cli login juan
+source /home/juanpa/venvs/grpc/bin/activate && cd "/home/juanpa/Proyecto 1/Proyecto 1/Cliente" && python3 -m src.cli put ejemplo.txt
+source /home/juanpa/venvs/grpc/bin/activate && cd "/home/juanpa/Proyecto 1/Proyecto 1/Cliente" && python3 -m src.cli ls
+
+source /home/juanpa/venvs/grpc/bin/activate && cd "/home/juanpa/Proyecto 1/Proyecto 1/Cliente" && echo "123456" | python3 -m src.cli register velez
+source /home/juanpa/venvs/grpc/bin/activate && cd "/home/juanpa/Proyecto 1/Proyecto 1/Cliente" && echo "123456" | python3 -m src.cli login velez
+source /home/juanpa/venvs/grpc/bin/activate && cd "/home/juanpa/Proyecto 1/Proyecto 1/Cliente" && python3 -m src.cli put ejemplo.txt
+source /home/juanpa/venvs/grpc/bin/activate && cd "/home/juanpa/Proyecto 1/Proyecto 1/Cliente" && python3 -m src.cli ls
