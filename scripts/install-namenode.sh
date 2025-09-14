@@ -112,7 +112,7 @@ if [ -n "$REPO_URL" ]; then
 else
     log_warning "No se proporcionó URL del repositorio."
     log_warning "Debes subir manualmente los archivos del proyecto a $GRIDDFS_DIR"
-    log_warning "Usa: scp -i tu-keypair.pem -r ./Proyecto\\ 1/* ubuntu@<IP_NAMENODE>:~/griddfs/"
+    log_warning "Usa: scp -i tu-keypair.pem -r ./GridFS/* ubuntu@<IP_NAMENODE>:~/griddfs/"
 fi
 
 # Verificar que existe el directorio NameNode

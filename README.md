@@ -101,19 +101,19 @@ GridFS/
 ```bash
 # Despliegue completo en AWS
 chmod +x scripts/deploy-griddfs-aws.sh
-./scripts/deploy-griddfs-aws.sh -k tu-keypair -r https://github.com/tu-usuario/GridFS.git
+./scripts/deploy-griddfs-aws.sh -k tu-keypair -r https://github.com/Henao13/GridFS.git
 
 # O instalar componentes individualmente
-curl -sSL https://raw.githubusercontent.com/tu-usuario/GridFS/main/scripts/install-namenode.sh | bash
-curl -sSL https://raw.githubusercontent.com/tu-usuario/GridFS/main/scripts/install-datanode.sh | bash
-curl -sSL https://raw.githubusercontent.com/tu-usuario/GridFS/main/scripts/install-client.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-namenode.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-datanode.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-client.sh | bash
 ```
 
 ### Opción 2: Instalación Manual
 
 #### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/tu-usuario/GridFS.git
+git clone https://github.com/Henao13/GridFS.git
 cd GridFS
 ```
 
@@ -239,7 +239,7 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo [LICENSE](LICENSE) para
 
 ## 👨‍� **Autores**
 
-- **Santiago** - Desarrollo principal - [@tu-usuario](https://github.com/tu-usuario)
+- **Santiago** - Desarrollo principal - [@Henao13](https://github.com/Henao13)
 
 ## 🔗 **Enlaces Útiles**
 

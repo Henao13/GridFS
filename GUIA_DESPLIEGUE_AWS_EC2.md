@@ -31,10 +31,10 @@ He creado scripts automatizados para facilitar la instalación. Estos scripts es
 ### Script de Instalación NameNode
 ```bash
 # En la instancia NameNode
-curl -sSL https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-namenode.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-namenode.sh | bash
 
 # O descarga y ejecuta localmente
-wget https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-namenode.sh
+wget https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-namenode.sh
 chmod +x install-namenode.sh
 ./install-namenode.sh
 ```
@@ -42,19 +42,19 @@ chmod +x install-namenode.sh
 ### Script de Instalación DataNode
 ```bash
 # En cada instancia DataNode
-curl -sSL https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-datanode.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-datanode.sh | bash
 
 # O con configuración personalizada
-NAMENODE_HOST=172.31.x.x curl -sSL https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-datanode.sh | bash
+NAMENODE_HOST=172.31.x.x curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-datanode.sh | bash
 ```
 
 ### Script de Instalación Cliente
 ```bash
 # En la instancia cliente
-curl -sSL https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-client.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-client.sh | bash
 
 # O con configuración personalizada
-NAMENODE_HOST=ip-publica-namenode DATANODE_HOST=ip-publica-datanode curl -sSL https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-client.sh | bash
+NAMENODE_HOST=ip-publica-namenode DATANODE_HOST=ip-publica-datanode curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-client.sh | bash
 ```
 
 ### Instalación Manual (Alternativa)
@@ -202,7 +202,7 @@ aws ec2 run-instances \
 ssh -i tu-keypair.pem ubuntu@<IP_NAMENODE>
 
 # Instalar usando el script automatizado
-curl -sSL https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-namenode.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-namenode.sh | bash
 
 # O subir archivos manualmente
 # scp -i tu-keypair.pem -r ./Proyecto\ 1/* ubuntu@<IP_NAMENODE>:~/griddfs/
@@ -227,7 +227,7 @@ NAMENODE_PRIVATE_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values
 ssh -i tu-keypair.pem ubuntu@<IP_DATANODE>
 
 # Instalar con configuración
-NAMENODE_HOST=$NAMENODE_PRIVATE_IP curl -sSL https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-datanode.sh | bash
+NAMENODE_HOST=$NAMENODE_PRIVATE_IP curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-datanode.sh | bash
 
 # Iniciar servicio
 sudo systemctl start griddfs-datanode
@@ -248,7 +248,7 @@ DATANODE_PUBLIC_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=
 ssh -i tu-keypair.pem ubuntu@<IP_CLIENTE>
 
 # Instalar con configuración
-NAMENODE_HOST=$NAMENODE_PUBLIC_IP DATANODE_HOST=$DATANODE_PUBLIC_IP curl -sSL https://raw.githubusercontent.com/tu-usuario/tu-repo/main/scripts/install-client.sh | bash
+NAMENODE_HOST=$NAMENODE_PUBLIC_IP DATANODE_HOST=$DATANODE_PUBLIC_IP curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-client.sh | bash
 ```
 
 ### Verificación del Sistema Completo
@@ -697,10 +697,10 @@ mkdir -p ~/griddfs
 cd ~/griddfs
 
 # Clonar tu repositorio (reemplaza con tu repo)
-git clone https://github.com/tu-usuario/tu-repo.git .
+git clone https://github.com/Henao13/GridFS.git .
 
 # O subir archivos manualmente
-# scp -i tu-keypair.pem -r ./Proyecto\ 1/* ubuntu@<IP_NAMENODE>:~/griddfs/
+# scp -i tu-keypair.pem -r ./GridFS/* ubuntu@<IP_NAMENODE>:~/griddfs/
 ```
 
 #### 3. Compilar NameNode
@@ -793,11 +793,11 @@ echo $JAVA_HOME  # Debe mostrar /usr/lib/jvm/java-17-openjdk-amd64
 mkdir -p ~/griddfs
 cd ~/griddfs
 
-# Clonar tu repositorio (reemplaza con tu repo)
-git clone https://github.com/tu-usuario/tu-repo.git .
+# Clonar tu repositorio
+git clone https://github.com/Henao13/GridFS.git .
 
 # O subir archivos manualmente
-# scp -i tu-keypair.pem -r ./Proyecto\ 1/* ubuntu@<IP_DATANODE>:~/griddfs/
+# scp -i tu-keypair.pem -r ./GridFS/* ubuntu@<IP_DATANODE>:~/griddfs/
 ```
 
 #### 3. Compilar DataNode
@@ -911,7 +911,7 @@ mkdir -p ~/griddfs
 cd ~/griddfs
 
 # Clonar tu repositorio
-git clone https://github.com/tu-usuario/tu-repo.git .
+git clone https://github.com/Henao13/GridFS.git .
 
 # Navegar al directorio del cliente
 cd ~/griddfs/Cliente/src

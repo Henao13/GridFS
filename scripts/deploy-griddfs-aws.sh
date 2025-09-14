@@ -330,7 +330,7 @@ log_step "7️⃣  Desplegando NameNode..."
 log_info "Conectando a NameNode y ejecutando instalación..."
 ssh -i "$HOME/.ssh/$KEYPAIR_NAME.pem" -o StrictHostKeyChecking=no ubuntu@"$NAMENODE_PUBLIC_IP" << EOF
 export REPO_URL="$REPO_URL"
-curl -sSL https://raw.githubusercontent.com/tu-usuario/griddfs/main/scripts/install-namenode.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-namenode.sh | bash
 sudo systemctl start griddfs-namenode
 sleep 5
 sudo systemctl status griddfs-namenode
@@ -347,7 +347,7 @@ for i in "${!DATANODE_INSTANCE_IDS[@]}"; do
   ssh -i "$HOME/.ssh/$KEYPAIR_NAME.pem" -o StrictHostKeyChecking=no ubuntu@"${DATANODE_PUBLIC_IPS[i]}" << EOF
 export REPO_URL="$REPO_URL"
 export NAMENODE_HOST="$NAMENODE_PRIVATE_IP"
-curl -sSL https://raw.githubusercontent.com/tu-usuario/griddfs/main/scripts/install-datanode.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-datanode.sh | bash
 sudo systemctl start griddfs-datanode
 sleep 5
 sudo systemctl status griddfs-datanode
@@ -363,7 +363,7 @@ ssh -i "$HOME/.ssh/$KEYPAIR_NAME.pem" -o StrictHostKeyChecking=no ubuntu@"$CLIEN
 export REPO_URL="$REPO_URL"
 export NAMENODE_HOST="$NAMENODE_PUBLIC_IP"
 export DATANODE_HOST="${DATANODE_PUBLIC_IPS[0]}"
-curl -sSL https://raw.githubusercontent.com/tu-usuario/griddfs/main/scripts/install-client.sh | bash
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-client.sh | bash
 EOF
 
 log_info "✅ Cliente desplegado"
