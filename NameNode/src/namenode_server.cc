@@ -373,8 +373,36 @@ Status NameNodeServiceImpl::ListFiles(ServerContext* /*ctx*/,
         return Status(grpc::StatusCode::UNAUTHENTICATED, "Usuario no válido");
     }
 
-    // Primero agregar directorios
-    for (const auto& directory : directories_) {
+    // Primero recopilar directorios únicos del usuario basado en sus archivos
+    std::set<std::string> user_directories;
+    
+    for (const auto& kv : files_) {
+        const std::string& file_key = kv.first;
+        
+        // Verificar si el archivo pertenece al usuario actual
+        std::string prefix = user_id + ":";
+        if (!starts_with(file_key, prefix)) {
+            continue;
+        }
+        
+        // Extraer el nombre del archivo real (sin el user_id)
+        std::string filename = file_key.substr(prefix.length());
+        
+        // Extraer directorios de este archivo
+        std::string current_path = filename;
+        while (current_path.find('/') != std::string::npos) {
+            size_t last_slash = current_path.find_last_of('/');
+            if (last_slash != std::string::npos) {
+                current_path = current_path.substr(0, last_slash);
+                if (!current_path.empty()) {
+                    user_directories.insert(current_path);
+                }
+            }
+        }
+    }
+    
+    // Luego agregar directorios del usuario
+    for (const auto& directory : user_directories) {
         // Verificar si el directorio debería mostrarse en este nivel
         bool should_include_dir = false;
         std::string display_name;
