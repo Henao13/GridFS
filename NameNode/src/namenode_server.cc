@@ -388,19 +388,19 @@ Status NameNodeServiceImpl::ListFiles(ServerContext* /*ctx*/,
     
     // 2. Agregar directorios derivados de archivos del usuario
     for (const auto& kv : files_) {
-        const std::string& file_key = kv.first;
+        const std::string& dir_file_key = kv.first;
         
         // Verificar si el archivo pertenece al usuario actual
         std::string file_prefix = user_id + ":";
-        if (!starts_with(file_key, file_prefix)) {
+        if (!starts_with(dir_file_key, file_prefix)) {
             continue;
         }
         
         // Extraer el nombre del archivo real (sin el user_id)
-        std::string filename = file_key.substr(file_prefix.length());
+        std::string dir_filename = dir_file_key.substr(file_prefix.length());
         
         // Extraer directorios de este archivo
-        std::string current_path = filename;
+        std::string current_path = dir_filename;
         while (current_path.find('/') != std::string::npos) {
             size_t last_slash = current_path.find_last_of('/');
             if (last_slash != std::string::npos) {
