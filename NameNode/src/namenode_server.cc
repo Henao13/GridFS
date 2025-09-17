@@ -379,9 +379,11 @@ Status NameNodeServiceImpl::ListFiles(ServerContext* /*ctx*/,
     // 1. Agregar directorios creados explícitamente por el usuario
     std::string dir_prefix = user_id + ":";
     for (const auto& directory_key : directories_) {
+        std::cout << "[DEBUG] Checking directory_key: '" << directory_key << "' against prefix: '" << dir_prefix << "'\n";
         if (starts_with(directory_key, dir_prefix)) {
             // Extraer el directorio real (sin el user_id)
             std::string actual_dir = directory_key.substr(dir_prefix.length());
+            std::cout << "[DEBUG] Adding explicit directory: '" << actual_dir << "' to user_directories\n";
             user_directories.insert(actual_dir);
         }
     }
@@ -413,7 +415,9 @@ Status NameNodeServiceImpl::ListFiles(ServerContext* /*ctx*/,
     }
     
     // Luego agregar directorios del usuario
+    std::cout << "[DEBUG] user_directories contains " << user_directories.size() << " directories\n";
     for (const auto& directory : user_directories) {
+        std::cout << "[DEBUG] Processing directory: '" << directory << "' for listing in '" << dir << "'\n";
         // Verificar si el directorio debería mostrarse en este nivel
         bool should_include_dir = false;
         std::string display_name;
@@ -426,6 +430,7 @@ Status NameNodeServiceImpl::ListFiles(ServerContext* /*ctx*/,
                 if (subdir.find('/') == std::string::npos && !subdir.empty()) {
                     should_include_dir = true;
                     display_name = subdir;
+                    std::cout << "[DEBUG] Will show directory '" << display_name << "' in root\n";
                 }
             }
         } else {
