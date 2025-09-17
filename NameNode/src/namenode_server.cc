@@ -573,6 +573,7 @@ Status NameNodeServiceImpl::CreateDirectory(ServerContext* /*ctx*/,
     
     // Crear clave única por usuario para el directorio
     std::string dir_key = user_id + ":" + dir;
+    std::cout << "[DEBUG] CreateDirectory storing key: '" << dir_key << "'\n";
     directories_.insert(dir_key);
     response->set_success(true);
     std::cout << "[CreateDirectory] " << dir << " creado por " << user_id << std::endl;
