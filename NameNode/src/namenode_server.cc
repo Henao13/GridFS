@@ -376,17 +376,28 @@ Status NameNodeServiceImpl::ListFiles(ServerContext* /*ctx*/,
     // Primero recopilar directorios únicos del usuario basado en sus archivos
     std::set<std::string> user_directories;
     
+    // 1. Agregar directorios creados explícitamente por el usuario
+    std::string dir_prefix = user_id + ":";
+    for (const auto& directory_key : directories_) {
+        if (starts_with(directory_key, dir_prefix)) {
+            // Extraer el directorio real (sin el user_id)
+            std::string actual_dir = directory_key.substr(dir_prefix.length());
+            user_directories.insert(actual_dir);
+        }
+    }
+    
+    // 2. Agregar directorios derivados de archivos del usuario
     for (const auto& kv : files_) {
         const std::string& file_key = kv.first;
         
         // Verificar si el archivo pertenece al usuario actual
-        std::string prefix = user_id + ":";
-        if (!starts_with(file_key, prefix)) {
+        std::string file_prefix = user_id + ":";
+        if (!starts_with(file_key, file_prefix)) {
             continue;
         }
         
         // Extraer el nombre del archivo real (sin el user_id)
-        std::string filename = file_key.substr(prefix.length());
+        std::string filename = file_key.substr(file_prefix.length());
         
         // Extraer directorios de este archivo
         std::string current_path = filename;
@@ -555,7 +566,9 @@ Status NameNodeServiceImpl::CreateDirectory(ServerContext* /*ctx*/,
         return Status(grpc::StatusCode::UNAUTHENTICATED, "Usuario no válido");
     }
     
-    directories_.insert(dir);
+    // Crear clave única por usuario para el directorio
+    std::string dir_key = user_id + ":" + dir;
+    directories_.insert(dir_key);
     response->set_success(true);
     std::cout << "[CreateDirectory] " << dir << " creado por " << user_id << std::endl;
 
@@ -580,13 +593,16 @@ Status NameNodeServiceImpl::RemoveDirectory(ServerContext* /*ctx*/,
         return Status(grpc::StatusCode::UNAUTHENTICATED, "Usuario no válido");
     }
     
+    // Crear clave única por usuario para el directorio
+    std::string dir_key = user_id + ":" + dir;
+    
     // Verificar que el directorio existe
-    if (directories_.find(dir) == directories_.end()) {
+    if (directories_.find(dir_key) == directories_.end()) {
         response->set_success(false);
         return Status(grpc::StatusCode::NOT_FOUND, "Directorio no encontrado");
     }
     
-    directories_.erase(dir);
+    directories_.erase(dir_key);
     response->set_success(true);
     std::cout << "[RemoveDirectory] " << dir << " eliminado por " << user_id << std::endl;
 

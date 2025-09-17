@@ -520,19 +520,19 @@ sleep 5 && sudo systemctl status griddfs-datanode
 ### Especificaciones por Componente
 
 #### NameNode (Servidor de Metadatos)
-- **AMI**: Ubuntu Server 22.04 LTS
+- **AMI**: Ubuntu Server 22.04 LTS o Amazon Linux 2023
 - **Tipo de Instancia**: t3.small (2 vCPU, 2 GB RAM)
 - **Almacenamiento**: 20 GB GP3
 - **Nombre sugerido**: `griddfs-namenode`
 
 #### DataNode (Servidores de Almacenamiento)
-- **AMI**: Ubuntu Server 22.04 LTS
+- **AMI**: Ubuntu Server 22.04 LTS o Amazon Linux 2023  
 - **Tipo de Instancia**: t3.medium (2 vCPU, 4 GB RAM)
 - **Almacenamiento**: 50 GB GP3 (para datos del sistema de archivos)
 - **Nombre sugerido**: `griddfs-datanode-1`, `griddfs-datanode-2`, etc.
 
 #### Cliente (Opcional - para pruebas)
-- **AMI**: Ubuntu Server 22.04 LTS
+- **AMI**: Ubuntu Server 22.04 LTS o Amazon Linux 2023
 - **Tipo de Instancia**: t3.micro (1 vCPU, 1 GB RAM)
 - **Almacenamiento**: 15 GB GP3
 - **Nombre sugerido**: `griddfs-client`
@@ -545,7 +545,9 @@ sleep 5 && sudo systemctl status griddfs-datanode
    ```
 
 2. **Launch Instance**
-   - Application and OS Images: Ubuntu Server 22.04 LTS (HVM)
+   - Application and OS Images: 
+     - **Recomendado**: Ubuntu Server 22.04 LTS (HVM)
+     - **También soportado**: Amazon Linux 2023
    - Architecture: 64-bit (x86)
 
 3. **Key Pair**
@@ -616,6 +618,59 @@ aws ec2 authorize-security-group-ingress \
     --protocol tcp \
     --port 50051 \
     --cidr $MY_IP
+```
+
+---
+
+## ⚡ **Configuración para Instancia Existente (Amazon Linux 2023)**
+
+Si ya tienes una instancia como la que muestras:
+- **AMI**: Amazon Linux 2023 (`ami-0b09ffb6d8b58ca91`)
+- **Tipo**: t3.micro
+- **Storage**: 8 GiB
+
+### **Pasos para Configurarla:**
+
+#### 1. **Conectar a la Instancia**
+```bash
+# Conectar via SSH (reemplaza con tu IP y keypair)
+ssh -i tu-keypair.pem ec2-user@<IP_PUBLICA_INSTANCIA>
+```
+⚠️ **Nota**: Amazon Linux usa `ec2-user` en lugar de `ubuntu`
+
+#### 2. **Instalar Dependencias Base**
+```bash
+# Descargar script de instalación automática
+curl -sSL https://raw.githubusercontent.com/Henao13/GridFS/main/scripts/install-base.sh | bash
+```
+
+#### 3. **Configurar Security Group**
+Tu instancia necesita los puertos:
+- **22** (SSH) - ✅ Ya configurado
+- **50050** (NameNode) - ⚠️ Agregar
+- **50051** (DataNode) - ⚠️ Agregar
+
+```bash
+# Obtener el Security Group ID de tu instancia
+aws ec2 describe-instances --instance-ids i-tu-instance-id --query 'Reservations[].Instances[].SecurityGroups[].GroupId'
+
+# Agregar reglas (reemplaza sg-xxxxx con tu Security Group ID)
+aws ec2 authorize-security-group-ingress --group-id sg-xxxxx --protocol tcp --port 50050 --cidr 0.0.0.0/0
+aws ec2 authorize-security-group-ingress --group-id sg-xxxxx --protocol tcp --port 50051 --cidr 0.0.0.0/0
+```
+
+#### 4. **Ampliar Storage (Opcional)**
+Para un sistema de producción, considera ampliar el storage:
+```bash
+# Crear snapshot (backup) primero
+aws ec2 create-snapshot --volume-id vol-tu-volume-id --description "Backup antes de expandir"
+
+# Modificar volumen (ejemplo: ampliar a 20GB)
+aws ec2 modify-volume --volume-id vol-tu-volume-id --size 20
+
+# Expandir filesystem dentro de la instancia
+sudo growpart /dev/xvda1 1
+sudo resize2fs /dev/xvda1
 ```
 
 ---
