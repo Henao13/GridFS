@@ -311,9 +311,9 @@ def main():
                 print(f"Contenido de {target_dir}:")
                 for file_meta in resp.files:
                     if hasattr(file_meta, 'filename'):  # Nuevo formato con metadata
-                        if file_meta.filename.endswith('/'):
-                            # Es un directorio
-                            print(f"  📁 {file_meta.filename}")
+                        if file_meta.filename.startswith('📁 '):
+                            # Es un directorio (el servidor ya incluye el emoji)
+                            print(f"  {file_meta.filename}")
                         else:
                             # Es un archivo
                             print(f"  📄 {file_meta.filename} (propietario: {file_meta.owner_id}, tamaño: {file_meta.size} bytes)")
